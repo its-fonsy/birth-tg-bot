@@ -3,23 +3,18 @@
 import datetime
 
 BIRTHDAYS_DATABASE = "bday.dat"
-
-
-def convert_month(month):
-    month_conv = { 'January'   : 1,
-              'February'  : 2,
-              'March'     : 3,
-              'April'     : 4,
-              'May'       : 5,
-              'June'      : 6,
-              'July'      : 7,
-              'August'    : 8,
-              'September' : 9,
-              'October'   : 10,
-              'November'  : 11,
-              'December'  : 12, }
-
-    return month_conv[month]
+month_conv = { 'January'   : 1,
+               'February'  : 2,
+               'March'     : 3,
+               'April'     : 4,
+               'May'       : 5,
+               'June'      : 6,
+               'July'      : 7,
+               'August'    : 8,
+               'September' : 9,
+               'October'   : 10,
+               'November'  : 11,
+               'December'  : 12 }
 
 
 def check_birthday():
@@ -35,7 +30,7 @@ def check_birthday():
         for line in birth_file:
             month, day, name, surname = line.split(' ')
             day   = int(day)
-            month = convert_month(month)
+            month = month_conv[month]
 
             if (current_day == day) and (current_month == month):
                 birthday_list.append([name, surname.strip()])
@@ -51,5 +46,43 @@ def birthday_message(birthday_list):
         print(message)
 
 
+def add_birthday(month, day, name, surname):
+
+    with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
+        old = birth_file.read()
+
+    # convert month from number to text
+    month_number = month
+    for k in month_conv:
+        if month_conv[k] == month:
+            month = k
+
+    # generate the new list of birthdays
+    added = False
+    old_list = old.split('\n')
+    new_list = []
+    for b in old_list:
+        try:
+            m, d, n, s = b.split(' ')
+        except:
+            continue
+        d = int(d)
+        m = month_conv[m]
+
+        if ((month_number == m and (d >= day or day == 1)) or month_number < m) != added:
+            new_list.append(f"{month} {day} {name} {surname}")
+            added = True
+
+        new_list.append(b)
+
+    # write the new list into the file
+    with open(BIRTHDAYS_DATABASE, 'w') as birth_file:
+        for bir in new_list:
+            birth_file.write(bir)
+            birth_file.write('\n')
+
+
+
 birthday_list = check_birthday()
 birthday_message(birthday_list)
+add_birthday(1, 1, 'Luca', 'Laurenti')
