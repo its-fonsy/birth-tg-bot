@@ -38,10 +38,18 @@ def check_birthday():
             month = convert_month(month)
 
             if (current_day == day) and (current_month == month):
-                print("added ", name)
                 birthday_list.append([name, surname.strip()])
 
     return birthday_list
 
-print(check_birthday())
 
+def birthday_message(birthday_list):
+    for person in birthday_list:
+        name = person[0]
+        surname = person[1]
+        message = f"Today is the birthday of {name} {surname}!"
+        print(message)
+
+
+birthday_list = check_birthday()
+birthday_message(birthday_list)
