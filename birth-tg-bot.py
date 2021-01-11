@@ -20,8 +20,10 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# name of the database
 BIRTHDAYS_DATABASE = "bday.dat"
 
+# check all the required file exist
 try:
     with open("token", "r") as token_file:
         TOKEN = token_file.read().strip()
@@ -43,6 +45,7 @@ except IOError:
     logger.info("ERROR: birthday database missing. Exiting")
     quit()
 
+# dict used to convert the month from name to number
 month_conv = { 'January'   : 1,
                'February'  : 2,
                'March'     : 3,
@@ -56,7 +59,9 @@ month_conv = { 'January'   : 1,
                'November'  : 11,
                'December'  : 12 }
 
+# constant used to handle conversation with the bot
 MONTH, DAY, NAME, RECAP, CONFIRM = range(5)
+
 
 def check_birthday():
     # get current day and month
@@ -81,6 +86,7 @@ def check_birthday():
 
 def add_birthday(month, day, name, surname):
 
+    # open the database and save its content
     with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
         old = birth_file.read()
 
@@ -90,7 +96,7 @@ def add_birthday(month, day, name, surname):
         if month_conv[k] == month:
             month = k
 
-    # generate the new list of birthdays
+    # generate the new list with the new birthday
     added = False
     old_list = old.split('\n')
     new_list = []
@@ -117,7 +123,7 @@ def add_birthday(month, day, name, surname):
 
 def start(update, context):
     if update.effective_chat.id == CHAT_ID:
-        context.bot.send_message(chat_id=CHAT_ID, text="Ciao Fonsy!")
+        context.bot.send_message(chat_id=CHAT_ID, text="Hi Fonsy!")
 
 
 def birthday_message(context):
@@ -149,7 +155,7 @@ def add(update, context):
         update.message.reply_text(
             'Add a birthday! Select the month',
             reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
-    )
+        )
 
     return MONTH
 
@@ -182,7 +188,7 @@ def day(update, context):
         update.message.reply_text(
             'Name and surname of the person to add',
             reply_markup=ReplyKeyboardRemove(),
-    )
+        )
 
     return RECAP
 
@@ -243,6 +249,7 @@ def main():
 
     global person_to_add
 
+    # telegram bot init
     updater = Updater(token=TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
