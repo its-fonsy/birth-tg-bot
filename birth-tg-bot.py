@@ -64,28 +64,6 @@ def check_birthday():
     return birthday_list
 
 
-def birthday_message(context):
-    logger.info("Checking birthday of the day")
-    birthday_list = check_birthday()
-
-    if birthday_list:
-        if len(birthday_list) > 1:
-            message = f"Today is the birthday of:\n"
-            for person in birthday_list:
-                name = person[0]
-                surname = person[1]
-                message += f" - {name} {surname}\n"
-                logger.info("Today is the birthday of %s %s", name, surname)
-        else:
-            message = f"Today is the birthday of {birthday_list[0][0]} {birthday_list[0][1]}!"
-            logger.info("Today is the birthday of %s %s", birthday_list[0][0], birthday_list[0][1])
-
-        context.bot.send_message(chat_id=CHAT_ID, text=message)
-    else:
-        context.bot.send_message(chat_id=CHAT_ID, text="Today there aren't any birthday")
-        logger.info("There aren't any birthday today")
-
-
 def add_birthday(month, day, name, surname):
 
     with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
@@ -125,6 +103,28 @@ def add_birthday(month, day, name, surname):
 def start(update, context):
     if update.effective_chat.id == CHAT_ID:
         context.bot.send_message(chat_id=CHAT_ID, text="Ciao Fonsy!")
+
+
+def birthday_message(context):
+    logger.info("Checking birthday of the day")
+    birthday_list = check_birthday()
+
+    if birthday_list:
+        if len(birthday_list) > 1:
+            message = f"Today is the birthday of:\n"
+            for person in birthday_list:
+                name = person[0]
+                surname = person[1]
+                message += f" - {name} {surname}\n"
+                logger.info("Today is the birthday of %s %s", name, surname)
+        else:
+            message = f"Today is the birthday of {birthday_list[0][0]} {birthday_list[0][1]}!"
+            logger.info("Today is the birthday of %s %s", birthday_list[0][0], birthday_list[0][1])
+
+        context.bot.send_message(chat_id=CHAT_ID, text=message)
+    else:
+        context.bot.send_message(chat_id=CHAT_ID, text="Today there aren't any birthday")
+        logger.info("There aren't any birthday today")
 
 
 def add(update, context):
@@ -224,40 +224,37 @@ def listing(update, context):
         context.bot.send_message(chat_id=CHAT_ID, text=content)
 
 
-def daily_job(update, context):
-    if update.effective_chat.id == CHAT_ID:
-        context.bot.send_message(chat_id=CHAT_ID, text='Setting a daily notifications!')
-        t = datetime.time(20, 31, 0, 0)
+def main():
 
+    global person_to_add
 
-global person_to_add
+    updater = Updater(token=TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
 
-updater = Updater(token=TOKEN, use_context=True)
-dispatcher = updater.dispatcher
+    start_handler = CommandHandler('start', start)
+    list_handler = CommandHandler('list', listing)
+    add_handler = ConversationHandler(
+            entry_points=[CommandHandler('add', add)],
+            states={
+                MONTH: [MessageHandler(Filters.text, month)],
+                DAY: [MessageHandler(Filters.text, day)],
+                RECAP: [MessageHandler(Filters.text, recap)],
+                CONFIRM: [MessageHandler(Filters.text, confirm)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)],
+    )
 
-start_handler = CommandHandler('start', start)
-list_handler = CommandHandler('list', listing)
-notify_handler = CommandHandler('notify', daily_job)
-add_handler = ConversationHandler(
-        entry_points=[CommandHandler('add', add)],
-        states={
-            MONTH: [MessageHandler(Filters.text, month)],
-            DAY: [MessageHandler(Filters.text, day)],
-            RECAP: [MessageHandler(Filters.text, recap)],
-            CONFIRM: [MessageHandler(Filters.text, confirm)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-)
+    dispatcher.add_handler(start_handler)
+    dispatcher.add_handler(list_handler)
+    dispatcher.add_handler(add_handler)
+    updater.job_queue.run_daily(
+        callback=birthday_message,
+        time=datetime.time(hour=0, minute=1, tzinfo=pytz.timezone('Europe/Rome')),
+        days=tuple(range(7))
+    )
 
-dispatcher.add_handler(start_handler)
-dispatcher.add_handler(list_handler)
-dispatcher.add_handler(add_handler)
-dispatcher.add_handler(notify_handler)
-updater.job_queue.run_daily(
-    callback=birthday_message,
-    time=datetime.time(hour=12, minute=19, tzinfo=pytz.timezone('Europe/Rome')),
-    days=tuple(range(7))
-)
+    updater.start_polling()
+    updater.idle()
 
-updater.start_polling()
-updater.idle()
+if __name__ == "__main__":
+    main()
