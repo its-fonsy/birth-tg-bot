@@ -22,11 +22,26 @@ logger = logging.getLogger(__name__)
 
 BIRTHDAYS_DATABASE = "bday.dat"
 
-with open("token", "r") as token_file:
-    TOKEN = token_file.read().strip()
+try:
+    with open("token", "r") as token_file:
+        TOKEN = token_file.read().strip()
+except IOError:
+    logger.info("ERROR: token file missing. Exiting")
+    quit()
 
-with open("chat_id", "r") as id_file:
-    CHAT_ID = int(id_file.read().strip())
+try:
+    with open("chat_id", "r") as id_file:
+        CHAT_ID = int(id_file.read().strip())
+except IOError:
+    logger.info("ERROR: chat_id file missing. Exiting")
+    quit()
+
+try:
+    with open(BIRTHDAYS_DATABASE, "r") as id_file:
+        pass
+except IOError:
+    logger.info("ERROR: birthday database missing. Exiting")
+    quit()
 
 month_conv = { 'January'   : 1,
                'February'  : 2,
