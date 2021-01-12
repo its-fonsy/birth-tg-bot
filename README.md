@@ -34,8 +34,6 @@ The database has this format
 	August 15 Jennifer Lawrence
 	September 2 Keanu Reeves
 
-**Important**: They must be ordered in month and day.
-
 You can use the `bday.template` file to start adding your birthdays.
 
 ## Usage
@@ -43,3 +41,17 @@ Once the bot is running you can send with telegram this command to the bot:
 
 - `\list` to list all the birthday of your database
 - `\add` to add a birthday to your database
+- `\next` to see the four next coming birthday
+- `\update` to sync the list of the database with the list of the bot
+
+### BotFather
+The message that I use with Botfather to `\setcommands`
+
+```
+start - the bot say hi
+list - list all the birthday of your database
+add - add a birthday to your database
+next - see the four next coming birthday
+update - sync the list of the database with the list of the bot
+cancel - cancel the operation when adding a person
+```
