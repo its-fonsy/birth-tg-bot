@@ -19,7 +19,7 @@ Clone the repo
 create the files to store the `token` of your bot, the `chat_id` of your profile and
 the database with all the birthdays
 
-	touch token chat_id bdays.dat
+	touch token chat_id bday.dat
 
 fill for each file the required information then start the bot
 
