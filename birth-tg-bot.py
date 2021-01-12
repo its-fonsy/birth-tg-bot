@@ -121,6 +121,7 @@ class BirthdayBot( object ):
 
         start_handler = CommandHandler('start', self.start)
         list_handler = CommandHandler('list', self.listing)
+        update_handler = CommandHandler('update', self.update_list)
 
         # constant used to handle conversation with the bot
         # to add a birthday via telegram
@@ -139,6 +140,7 @@ class BirthdayBot( object ):
 
         self.dispatcher.add_handler(start_handler)
         self.dispatcher.add_handler(list_handler)
+        self.dispatcher.add_handler(update_handler)
         self.dispatcher.add_handler(add_handler)
         self.updater.job_queue.run_daily(
             callback=self.birthday_message,
@@ -302,9 +304,30 @@ class BirthdayBot( object ):
 
     def listing(self, update: Update, context:CallbackContext) -> None:
         if update.effective_chat.id == CHAT_ID:
+            logger.info("Requested list of birthday")
+            message = ""
+            for person in self.birthday_list:
+                message += person.string() + "\n"
+
+            context.bot.send_message(chat_id=CHAT_ID, text=message)
+
+
+    def update_list(self, update: Update, context:CallbackContext) -> None:
+        logger.info("Updating the list of birthday")
+        if update.effective_chat.id == CHAT_ID:
             with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
-                content = birth_file.read()
-            context.bot.send_message(chat_id=CHAT_ID, text=content)
+                for line in birth_file:
+                    month, day, name, surname = line.strip().split(' ')
+                    day   = int(day)
+                    month = month_conv[month]
+                    dummy = Person(month, day, name, surname)
+
+                    if dummy not in self.birthday_list:
+                        logger.info("Added %s %s to the list", dummy.name, dummy.surname)
+                        self.birthday_list.append(dummy)
+                        self.birthday_list.sort()
+
+        context.bot.send_message(chat_id=CHAT_ID, text="List updated!")
 
 
 def main():
