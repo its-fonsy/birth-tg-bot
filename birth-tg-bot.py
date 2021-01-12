@@ -70,11 +70,18 @@ class Person( object ):
 
 
     def is_birthday(self) -> bool:
+        """
+        return if True if today it's his/her birthday
+        """
         now = datetime.datetime.now()
         return (now.month == self.month) and (now.day == self.day)
 
 
     def string(self) -> str:
+        """
+        return string of the person
+        Example: January 1 Mario Rossi
+        """
         for month in month_conv:
             if month_conv[month] == self.month:
                 birth = month; break
@@ -109,7 +116,6 @@ class BirthdayBot( object ):
         self.updater = Updater(token=TOKEN, use_context=True)
         self.dispatcher = self.updater.dispatcher
 
-        self.person_to_add = Person(1, 1, "a", "a")
         self.birthday_list = []
         self.create_birthday_list()
 
@@ -117,7 +123,9 @@ class BirthdayBot( object ):
         list_handler = CommandHandler('list', self.listing)
 
         # constant used to handle conversation with the bot
+        # to add a birthday via telegram
         self.MONTH, self.DAY, self.NAME, self.RECAP, self.CONFIRM = range(5)
+        self.person_to_add = Person(1, 1, "a", "a")
         add_handler = ConversationHandler(
                 entry_points=[CommandHandler('add', self.add)],
                 states={
@@ -138,6 +146,7 @@ class BirthdayBot( object ):
             days=tuple(range(7))
         )
 
+        # start the main loop
         self.updater.start_polling()
         self.updater.idle()
 
