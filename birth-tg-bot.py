@@ -121,7 +121,8 @@ class BirthdayBot( object ):
 
         start_handler = CommandHandler('start', self.start)
         list_handler = CommandHandler('list', self.listing)
-        update_handler = CommandHandler('update', self.update_list)
+        update_handler = CommandHandler('update', self.update)
+        next_handler = CommandHandler('next', self.next)
 
         # constant used to handle conversation with the bot
         # to add a birthday via telegram
@@ -141,6 +142,7 @@ class BirthdayBot( object ):
         self.dispatcher.add_handler(start_handler)
         self.dispatcher.add_handler(list_handler)
         self.dispatcher.add_handler(update_handler)
+        self.dispatcher.add_handler(next_handler)
         self.dispatcher.add_handler(add_handler)
         self.updater.job_queue.run_daily(
             callback=self.birthday_message,
@@ -168,6 +170,7 @@ class BirthdayBot( object ):
 
     def add_birthday(self, p:Person) -> None:
         """ Add a birthday to the list and database """
+        self.update_list()
         self.birthday_list.append(p)
         self.birthday_list.sort()
         with open(BIRTHDAYS_DATABASE, 'w') as birth_file:
@@ -279,12 +282,12 @@ class BirthdayBot( object ):
             if update.message.text == 'Yes':
                 self.add_birthday(self.person_to_add)
                 update.message.reply_text('Person added!', reply_markup=ReplyKeyboardRemove())
-                logger.info("added \"%s %s\" to the database",
+                logger.info("Added \"%s %s\" to the database",
                             self.person_to_add.name,
                             self.person_to_add.surname)
             else:
                 update.message.reply_text('Person not added!', reply_markup=ReplyKeyboardRemove())
-                logger.info("not added \"%s %s\" to the database",
+                logger.info("Not added \"%s %s\" to the database",
                             self.person_to_add.name,
                             self.person_to_add.surname)
 
@@ -312,22 +315,54 @@ class BirthdayBot( object ):
             context.bot.send_message(chat_id=CHAT_ID, text=message)
 
 
-    def update_list(self, update: Update, context:CallbackContext) -> None:
+    def update_list(self) -> None:
+        with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
+            for line in birth_file:
+                month, day, name, surname = line.strip().split(' ')
+                day   = int(day)
+                month = month_conv[month]
+                dummy = Person(month, day, name, surname)
+
+                if dummy not in self.birthday_list:
+                    logger.info("Added %s %s to the list", dummy.name, dummy.surname)
+                    self.birthday_list.append(dummy)
+                    self.birthday_list.sort()
+
+
+    def update(self, update: Update, context:CallbackContext) -> None:
         logger.info("Updating the list of birthday")
         if update.effective_chat.id == CHAT_ID:
-            with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
-                for line in birth_file:
-                    month, day, name, surname = line.strip().split(' ')
-                    day   = int(day)
-                    month = month_conv[month]
-                    dummy = Person(month, day, name, surname)
-
-                    if dummy not in self.birthday_list:
-                        logger.info("Added %s %s to the list", dummy.name, dummy.surname)
-                        self.birthday_list.append(dummy)
-                        self.birthday_list.sort()
+            self.update_list()
 
         context.bot.send_message(chat_id=CHAT_ID, text="List updated!")
+
+
+    def next(self, update: Update, context:CallbackContext) -> None:
+        """
+        Show the 4 next birthday
+        """
+        if update.effective_chat.id == CHAT_ID:
+            logger.info("Sending the next four birthday")
+            now = datetime.datetime.now()
+            dummy = Person(now.month, now.day, "A", "B")
+
+            # create the list with the next 4 birthday
+            next_birthday = []
+            n_birthday = 4
+            for person in self.birthday_list:
+                if (person > dummy) and (len(next_birthday) < n_birthday):
+                    next_birthday.append(person)
+
+            # deal when you are between december and january 
+            if len(next_birthday) < n_birthday:
+                for p in range(n_birthday - len(next_birthday)):
+                    next_birthday.append(self.birthday_list[p])
+
+            # create the message and send it
+            message = "The next four birthday are:\n"
+            for person in next_birthday:
+                message += f" - {person.string()}\n"
+            context.bot.send_message(chat_id=CHAT_ID, text=message)
 
 
 def main():
