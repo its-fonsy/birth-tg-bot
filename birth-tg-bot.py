@@ -59,224 +59,248 @@ month_conv = { 'January'   : 1,
                'November'  : 11,
                'December'  : 12 }
 
-# constant used to handle conversation with the bot
-MONTH, DAY, NAME, RECAP, CONFIRM = range(5)
+
+class Person( object ):
+
+    def __init__(self, m:int, d:int, n:str, s:str):
+        self.month = m
+        self.day = d
+        self.name = n
+        self.surname = s
 
 
-def check_birthday():
-    # get current day and month
-    now = datetime.datetime.now()
-    current_day = now.day
-    current_month = now.month
-
-    # list the birthdays of today
-    birthday_list = []
-
-    with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
-        for line in birth_file:
-            month, day, name, surname = line.split(' ')
-            day   = int(day)
-            month = month_conv[month]
-
-            if (current_day == day) and (current_month == month):
-                birthday_list.append([name, surname.strip()])
-
-    return birthday_list
+    def is_birthday(self) -> bool:
+        now = datetime.datetime.now()
+        return (now.month == self.month) and (now.day == self.day)
 
 
-def add_birthday(month, day, name, surname):
+    def string(self) -> str:
+        for month in month_conv:
+            if month_conv[month] == self.month:
+                birth = month; break
 
-    # open the database and save its content
-    with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
-        old = birth_file.read()
-
-    # convert month from number to text
-    month_number = month
-    for k in month_conv:
-        if month_conv[k] == month:
-            month = k
-
-    # generate the new list with the new birthday
-    added = False
-    old_list = old.split('\n')
-    new_list = []
-    for b in old_list:
-        try:
-            m, d, n, s = b.split(' ')
-        except:
-            continue
-        d = int(d)
-        m = month_conv[m]
-
-        if ((month_number == m and (d >= day or day == 1)) or month_number < m) != added:
-            new_list.append(f"{month} {day} {name} {surname}")
-            added = True
-
-        new_list.append(b)
-
-    # write the new list into the file
-    with open(BIRTHDAYS_DATABASE, 'w') as birth_file:
-        for bir in new_list:
-            birth_file.write(bir)
-            birth_file.write('\n')
+        birth += " " + str(self.day) + " "
+        birth += self.name + " "
+        birth += self.surname
+        return birth
 
 
-def start(update, context):
-    if update.effective_chat.id == CHAT_ID:
-        context.bot.send_message(chat_id=CHAT_ID, text="Hi Fonsy!")
+    def __eq__(self:object, other:object) -> bool:
+        return self.month == other.month and \
+            self.day == other.day and \
+            self.name == other.name and \
+            self.surname == other.surname
 
 
-def birthday_message(context):
-    logger.info("Checking birthday of the day")
-    birthday_list = check_birthday()
-
-    if birthday_list:
-        if len(birthday_list) > 1:
-            message = f"Today is the birthday of:\n"
-            for person in birthday_list:
-                name = person[0]
-                surname = person[1]
-                message += f" - {name} {surname}\n"
-                logger.info("Today is the birthday of %s %s", name, surname)
+    def __gt__(self:object, other:object) -> bool:
+        if self.month != other.month:
+            return self.month > other.month
         else:
-            message = f"Today is the birthday of {birthday_list[0][0]} {birthday_list[0][1]}!"
-            logger.info("Today is the birthday of %s %s", birthday_list[0][0], birthday_list[0][1])
-
-        context.bot.send_message(chat_id=CHAT_ID, text=message)
-    else:
-        context.bot.send_message(chat_id=CHAT_ID, text="Today there aren't any birthday")
-        logger.info("There aren't any birthday today")
+            return self.day > other.day
 
 
-def add(update, context):
-    if update.effective_chat.id == CHAT_ID:
-        logger.info("Requested to add a person")
-        reply_keyboard = [month_conv.keys()]
-        update.message.reply_text(
-            'Add a birthday! Select the month',
-            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
+    def __lt__(self:object, other:object) -> bool:
+        return not self.__gt__(other)
+
+
+class BirthdayBot( object ):
+
+    def __init__(self):
+        self.updater = Updater(token=TOKEN, use_context=True)
+        self.dispatcher = self.updater.dispatcher
+
+        self.person_to_add = Person(1, 1, "a", "a")
+        self.birthday_list = []
+        self.create_birthday_list()
+
+        start_handler = CommandHandler('start', self.start)
+        list_handler = CommandHandler('list', self.listing)
+
+        # constant used to handle conversation with the bot
+        self.MONTH, self.DAY, self.NAME, self.RECAP, self.CONFIRM = range(5)
+        add_handler = ConversationHandler(
+                entry_points=[CommandHandler('add', self.add)],
+                states={
+                    self.MONTH: [MessageHandler(Filters.text, self.add_month)],
+                    self.DAY: [MessageHandler(Filters.text, self.add_day)],
+                    self.RECAP: [MessageHandler(Filters.text, self.add_recap)],
+                    self.CONFIRM: [MessageHandler(Filters.text, self.add_confirm)],
+                },
+                fallbacks=[CommandHandler('cancel', self.add_cancel)],
         )
 
-    return MONTH
-
-
-def month(update, context):
-    user = update.message.from_user
-    global person_to_add
-    person_to_add = update.message.text
-
-    logger.info("Month of the person to add: %s", update.message.text)
-
-    if update.effective_chat.id == CHAT_ID:
-        update.message.reply_text(
-            'Select the day',
-            reply_markup=ReplyKeyboardRemove(),
-    )
-
-    return DAY
-
-
-def day(update, context):
-    user = update.message.from_user
-
-    global person_to_add
-    person_to_add += " " + update.message.text
-
-    logger.info("Day of the person to add: %s", update.message.text)
-
-    if update.effective_chat.id == CHAT_ID:
-        update.message.reply_text(
-            'Name and surname of the person to add',
-            reply_markup=ReplyKeyboardRemove(),
+        self.dispatcher.add_handler(start_handler)
+        self.dispatcher.add_handler(list_handler)
+        self.dispatcher.add_handler(add_handler)
+        self.updater.job_queue.run_daily(
+            callback=self.birthday_message,
+            time=datetime.time(hour=0, minute=1, tzinfo=pytz.timezone('Europe/Rome')),
+            days=tuple(range(7))
         )
 
-    return RECAP
+        self.updater.start_polling()
+        self.updater.idle()
 
 
-def recap(update, context):
-    user = update.message.from_user
-
-    global person_to_add
-    person_to_add += " " + update.message.text
-
-    if update.effective_chat.id == CHAT_ID:
-        reply_keyboard = [['Yes', 'No']]
-        update.message.reply_text('Confirm?',
-            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True), )
-
-    return CONFIRM
-
-
-def confirm(update, context):
-    user = update.message.from_user
-    reply_markup = ReplyKeyboardRemove(),
-    global person_to_add
-
-    if update.effective_chat.id == CHAT_ID:
-        if update.message.text == 'Yes':
-            m, d, n, s = person_to_add.split()
-            m = month_conv[m]
-            add_birthday(m, int(d), n, s)
-            update.message.reply_text('Person added!')
-            logger.info("added \"%s\" to the database", person_to_add)
-        else:
-            logger.info("not added \"%s\" to the database", person_to_add)
-            update.message.reply_text('Person not added!')
-
-    reply_keyboard = [month_conv.keys()]
-
-    return ConversationHandler.END
-
-
-def cancel(update, context):
-    user = update.message.from_user
-    logger.info("User %s canceled the conversation.", user.first_name)
-    update.message.reply_text(
-        'Bye! I hope we can talk again some day.', reply_markup=ReplyKeyboardRemove()
-    )
-
-    return ConversationHandler.END
-
-
-def listing(update, context):
-    if update.effective_chat.id == CHAT_ID:
+    def create_birthday_list(self) -> None:
+        """
+        Function that generate the list with all the birthdays
+        """
         with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
-            content = birth_file.read()
-        context.bot.send_message(chat_id=CHAT_ID, text=content)
+            for line in birth_file:
+                month, day, name, surname = line.strip().split(' ')
+                day   = int(day)
+                month = month_conv[month]
+
+                self.birthday_list.append(Person(month, day, name, surname))
+
+
+    def add_birthday(self, p:Person) -> None:
+        """ Add a birthday to the list and database """
+        self.birthday_list.append(p)
+        self.birthday_list.sort()
+        with open(BIRTHDAYS_DATABASE, 'w') as birth_file:
+            for birth in self.birthday_list:
+                line = birth.string()
+                birth_file.write(line)
+                birth_file.write('\n')
+
+
+    def start(self, update: Update, context:CallbackContext) -> None:
+        if update.effective_chat.id == CHAT_ID:
+            context.bot.send_message(chat_id=CHAT_ID, text="Hi Fonsy!")
+
+
+    def birthday_message(self, context:CallbackContext) -> None:
+        logger.info("Checking birthday of the day")
+
+        # get the list of todays birthdays
+        today_birthdays = []
+        for person in self.birthday_list:
+            if person.is_birthday():
+                today_birthdays.append(person)
+
+        # write the message based on the lenght of the list
+        if today_birthdays:
+            if len(today_birthdays) > 1:
+                message = f"Today is the birthday of:\n"
+                for person in today_birthdays:
+                    message += f" - {person.name} {person.surname}\n"
+                    logger.info("Today is the birthday of %s %s", person.name, person.surname)
+            else:
+                person = today_birthdays[0]
+                message = f"Today is the birthday of {person.name} {person.surname}!"
+                logger.info("Today is the birthday of %s %s", person.name, person.surname)
+
+            context.bot.send_message(chat_id=CHAT_ID, text=message)
+        else:
+            context.bot.send_message(chat_id=CHAT_ID, text="Today there aren't any birthday")
+            logger.info("There aren't any birthday today")
+
+
+    def add(self, update: Update, context:CallbackContext) -> int:
+        if update.effective_chat.id == CHAT_ID:
+            logger.info("Requested to add a person")
+            reply_keyboard = [
+               ['January', 'February', 'March', 'April' ],
+               ['May', 'June', 'July', 'August'],
+               ['September', 'October', 'November', 'December']
+            ]
+            update.message.reply_text(
+                'Add a birthday! Select the month',
+                reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
+            )
+
+        return self.MONTH
+
+
+    def add_month(self, update: Update, context:CallbackContext) -> int:
+        user = update.message.from_user
+        self.person_to_add.month = month_conv[update.message.text]
+
+        logger.info("Month of the person to add: %s", update.message.text)
+
+        if update.effective_chat.id == CHAT_ID:
+            update.message.reply_text(
+                'Select the day',
+                reply_markup=ReplyKeyboardRemove(),
+        )
+
+        return self.DAY
+
+
+    def add_day(self, update: Update, context:CallbackContext) -> int:
+        user = update.message.from_user
+
+        self.person_to_add.day = int(update.message.text)
+
+        logger.info("Day of the person to add: %s", update.message.text)
+
+        if update.effective_chat.id == CHAT_ID:
+            update.message.reply_text(
+                'Name and surname of the person to add',
+                reply_markup=ReplyKeyboardRemove(),
+            )
+
+        return self.RECAP
+
+
+    def add_recap(self, update: Update, context:CallbackContext) -> int:
+        user = update.message.from_user
+        name, surname = update.message.text.split()
+
+        self.person_to_add.name = name
+        self.person_to_add.surname = surname
+
+        if update.effective_chat.id == CHAT_ID:
+            reply_keyboard = [['Yes', 'No']]
+            update.message.reply_text('Confirm?',
+                reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True), )
+
+        return self.CONFIRM
+
+
+    def add_confirm(self, update: Update, context:CallbackContext) -> int:
+        user = update.message.from_user
+        reply_markup = ReplyKeyboardRemove(),
+
+        if update.effective_chat.id == CHAT_ID:
+            if update.message.text == 'Yes':
+                self.add_birthday(self.person_to_add)
+                update.message.reply_text('Person added!', reply_markup=ReplyKeyboardRemove())
+                logger.info("added \"%s %s\" to the database",
+                            self.person_to_add.name,
+                            self.person_to_add.surname)
+            else:
+                update.message.reply_text('Person not added!', reply_markup=ReplyKeyboardRemove())
+                logger.info("not added \"%s %s\" to the database",
+                            self.person_to_add.name,
+                            self.person_to_add.surname)
+
+
+        return ConversationHandler.END
+
+
+    def add_cancel(self, update: Update, context:CallbackContext) -> int:
+        user = update.message.from_user
+        logger.info("User %s canceled the conversation.", user.first_name)
+        update.message.reply_text(
+            'Bye! I hope we can talk again some day.', reply_markup=ReplyKeyboardRemove()
+        )
+
+        return ConversationHandler.END
+
+
+    def listing(self, update: Update, context:CallbackContext) -> None:
+        if update.effective_chat.id == CHAT_ID:
+            with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
+                content = birth_file.read()
+            context.bot.send_message(chat_id=CHAT_ID, text=content)
 
 
 def main():
+    bot = BirthdayBot()
 
-    global person_to_add
-
-    # telegram bot init
-    updater = Updater(token=TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-
-    start_handler = CommandHandler('start', start)
-    list_handler = CommandHandler('list', listing)
-    add_handler = ConversationHandler(
-            entry_points=[CommandHandler('add', add)],
-            states={
-                MONTH: [MessageHandler(Filters.text, month)],
-                DAY: [MessageHandler(Filters.text, day)],
-                RECAP: [MessageHandler(Filters.text, recap)],
-                CONFIRM: [MessageHandler(Filters.text, confirm)],
-            },
-            fallbacks=[CommandHandler('cancel', cancel)],
-    )
-
-    dispatcher.add_handler(start_handler)
-    dispatcher.add_handler(list_handler)
-    dispatcher.add_handler(add_handler)
-    updater.job_queue.run_daily(
-        callback=birthday_message,
-        time=datetime.time(hour=0, minute=1, tzinfo=pytz.timezone('Europe/Rome')),
-        days=tuple(range(7))
-    )
-
-    updater.start_polling()
-    updater.idle()
 
 if __name__ == "__main__":
     main()
