@@ -13,6 +13,7 @@ from telegram.ext import (
     CallbackContext,
 )
 
+
 # Enable logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
@@ -71,7 +72,7 @@ class Person( object ):
 
     def is_birthday(self) -> bool:
         """
-        return if True if today it's his/her birthday
+        return True if today it's his/her birthday
         """
         now = datetime.datetime.now()
         return (now.month == self.month) and (now.day == self.day)
@@ -119,10 +120,10 @@ class BirthdayBot( object ):
         self.birthday_list = []
         self.create_birthday_list()
 
-        start_handler = CommandHandler('start', self.start)
-        list_handler = CommandHandler('list', self.listing)
+        start_handler  = CommandHandler('start', self.start)
+        list_handler   = CommandHandler('list', self.listing)
         update_handler = CommandHandler('update', self.update)
-        next_handler = CommandHandler('next', self.next)
+        next_handler   = CommandHandler('next', self.next)
 
         # constant used to handle conversation with the bot
         # to add a birthday via telegram
@@ -131,19 +132,22 @@ class BirthdayBot( object ):
         add_handler = ConversationHandler(
                 entry_points=[CommandHandler('add', self.add)],
                 states={
-                    self.MONTH: [MessageHandler(Filters.text, self.add_month)],
-                    self.DAY: [MessageHandler(Filters.text, self.add_day)],
-                    self.RECAP: [MessageHandler(Filters.text, self.add_recap)],
+                    self.MONTH:   [MessageHandler(Filters.text, self.add_month)],
+                    self.DAY:     [MessageHandler(Filters.text, self.add_day)],
+                    self.RECAP:   [MessageHandler(Filters.text, self.add_recap)],
                     self.CONFIRM: [MessageHandler(Filters.text, self.add_confirm)],
                 },
                 fallbacks=[CommandHandler('cancel', self.add_cancel)],
         )
 
+        # define dispatchers
         self.dispatcher.add_handler(start_handler)
         self.dispatcher.add_handler(list_handler)
         self.dispatcher.add_handler(update_handler)
         self.dispatcher.add_handler(next_handler)
         self.dispatcher.add_handler(add_handler)
+
+        # daily birthday message job
         self.updater.job_queue.run_daily(
             callback=self.birthday_message,
             time=datetime.time(hour=0, minute=1, tzinfo=pytz.timezone('Europe/Rome')),
@@ -169,7 +173,9 @@ class BirthdayBot( object ):
 
 
     def add_birthday(self, p:Person) -> None:
-        """ Add a birthday to the list and database """
+        """
+        Add a birthday to the list and database
+        """
         self.update_list()
         self.birthday_list.append(p)
         self.birthday_list.sort()
@@ -181,11 +187,18 @@ class BirthdayBot( object ):
 
 
     def start(self, update: Update, context:CallbackContext) -> None:
+        """
+        when /start send from the correct user respond with Hi!
+        """
         if update.effective_chat.id == CHAT_ID:
-            context.bot.send_message(chat_id=CHAT_ID, text="Hi Fonsy!")
+            context.bot.send_message(chat_id=CHAT_ID, text="Hi!")
 
 
     def birthday_message(self, context:CallbackContext) -> None:
+        """
+        check for the birthday of today and send a message.
+        this function get called from daily job
+        """
         logger.info("Checking birthday of the day")
 
         # get the list of todays birthdays
@@ -213,6 +226,10 @@ class BirthdayBot( object ):
 
 
     def add(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        this function let you select the month
+        """
         if update.effective_chat.id == CHAT_ID:
             logger.info("Requested to add a person")
             reply_keyboard = [
@@ -229,6 +246,10 @@ class BirthdayBot( object ):
 
 
     def add_month(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        this function let you select the day
+        """
         user = update.message.from_user
         self.person_to_add.month = month_conv[update.message.text]
 
@@ -236,7 +257,7 @@ class BirthdayBot( object ):
 
         if update.effective_chat.id == CHAT_ID:
             update.message.reply_text(
-                'Select the day',
+                'Give me the day (must be a number)',
                 reply_markup=ReplyKeyboardRemove(),
         )
 
@@ -244,6 +265,10 @@ class BirthdayBot( object ):
 
 
     def add_day(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        this function let you select the name and surname
+        """
         user = update.message.from_user
 
         self.person_to_add.day = int(update.message.text)
@@ -252,7 +277,7 @@ class BirthdayBot( object ):
 
         if update.effective_chat.id == CHAT_ID:
             update.message.reply_text(
-                'Name and surname of the person to add',
+                'Name and surname of the person',
                 reply_markup=ReplyKeyboardRemove(),
             )
 
@@ -260,6 +285,10 @@ class BirthdayBot( object ):
 
 
     def add_recap(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        confirm that you want to add the person
+        """
         user = update.message.from_user
         name, surname = update.message.text.split()
 
@@ -275,6 +304,10 @@ class BirthdayBot( object ):
 
 
     def add_confirm(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        add the person to the list and database if confirmed
+        """
         user = update.message.from_user
         reply_markup = ReplyKeyboardRemove(),
 
@@ -291,11 +324,14 @@ class BirthdayBot( object ):
                             self.person_to_add.name,
                             self.person_to_add.surname)
 
-
         return ConversationHandler.END
 
 
     def add_cancel(self, update: Update, context:CallbackContext) -> int:
+        """
+        add a birthday via telegram messages.
+        cancel all the conversation
+        """
         user = update.message.from_user
         logger.info("User %s canceled the conversation.", user.first_name)
         update.message.reply_text(
@@ -306,6 +342,9 @@ class BirthdayBot( object ):
 
 
     def listing(self, update: Update, context:CallbackContext) -> None:
+        """
+        send a message with the list of all birthday
+        """
         if update.effective_chat.id == CHAT_ID:
             logger.info("Requested list of birthday")
             message = ""
@@ -316,6 +355,9 @@ class BirthdayBot( object ):
 
 
     def update_list(self) -> None:
+        """
+        sync database and bot list
+        """
         with open(BIRTHDAYS_DATABASE, 'r') as birth_file:
             for line in birth_file:
                 month, day, name, surname = line.strip().split(' ')
@@ -330,6 +372,9 @@ class BirthdayBot( object ):
 
 
     def update(self, update: Update, context:CallbackContext) -> None:
+        """
+        sync the list of bot with the database via telegram
+        """
         logger.info("Updating the list of birthday")
         if update.effective_chat.id == CHAT_ID:
             self.update_list()
@@ -365,7 +410,7 @@ class BirthdayBot( object ):
             context.bot.send_message(chat_id=CHAT_ID, text=message)
 
 
-def main():
+def main() -> None:
     bot = BirthdayBot()
 
 
